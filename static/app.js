@@ -1,0 +1,185 @@
+const statusEl = document.getElementById("status");
+const marqueeEl = document.getElementById("marquee");
+const coverEl = document.getElementById("cover");
+const albumMetaEl = document.getElementById("album-meta");
+const albumTypeEl = document.getElementById("album-type");
+const albumNameEl = document.getElementById("album-name");
+const albumArtistsEl = document.getElementById("album-artists");
+const releaseDateEl = document.getElementById("release-date");
+const trackKeyEl = document.getElementById("track-key");
+const trackDurationEl = document.getElementById("track-duration");
+const detailKeyEl = document.getElementById("detail-key");
+const detailDurationEl = document.getElementById("detail-duration");
+
+const ALBUM_TYPE_LABEL = {
+  album: "ALBUM",
+  single: "SINGLE",
+  compilation: "COMPILATION",
+};
+
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
+  return `${parts[0]} / ${parts[1]} / ${parts[2]}`;
+}
+
+function setAlbumInfo(data) {
+  albumTypeEl.textContent = ALBUM_TYPE_LABEL[data.album_type] ?? data.album_type ?? "";
+  albumNameEl.textContent = data.album ?? "";
+  albumArtistsEl.textContent = data.album_artists ?? "";
+  releaseDateEl.textContent = formatReleaseDate(data.release_date);
+  albumMetaEl.style.display = "";
+}
+
+function clearAlbumInfo() {
+  albumMetaEl.style.display = "none";
+}
+
+function setTrackDetails(data) {
+  // キー（取得できない曲は非表示）
+  if (data.key) {
+    trackKeyEl.textContent = data.key;
+    detailKeyEl.style.display = "";
+  } else {
+    trackKeyEl.textContent = "";
+    detailKeyEl.style.display = "none";
+  }
+  // 曲の長さ
+  if (data.duration) {
+    trackDurationEl.textContent = data.duration;
+    detailDurationEl.style.display = "";
+  } else {
+    detailDurationEl.style.display = "none";
+  }
+}
+
+function clearTrackDetails() {
+  detailKeyEl.style.display = "none";
+  detailDurationEl.style.display = "none";
+}
+
+const SCROLL_SPEED = 90; // px/s（数値を上げると速くなる）
+// コンテナ幅の何割分、最後の文字が消えたあとも流し続けるか
+const TAIL_RATIO = 0.3;
+
+let rafId = null;
+let marqueeX = null;
+let lastTs = null;
+let currentMarqueeText = null;
+
+function stopMarquee() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  marqueeX = null;
+  lastTs = null;
+  // transform はここではリセットしない（画面フラッシュの原因になる）
+}
+
+function tickMarquee(ts) {
+  // 毎フレーム寸法を読み直す → ウィンドウリサイズにも自動対応
+  const containerW = marqueeEl.parentElement.offsetWidth;
+  const textW = marqueeEl.scrollWidth; // flex-shrink を無効化した上で scrollWidth を使う
+  const startX = containerW;                          // 右端の外から入る
+  const endX = -(textW + containerW * TAIL_RATIO);   // テキスト全体が消えた少し先
+
+  if (marqueeX === null) marqueeX = startX;
+
+  if (lastTs !== null) {
+    const dt = (ts - lastTs) / 1000;
+    marqueeX -= SCROLL_SPEED * dt;
+    if (marqueeX <= endX) {
+      marqueeX = startX; // 先頭に戻る
+    }
+  }
+  lastTs = ts;
+
+  marqueeEl.style.transform = `translateX(${marqueeX}px)`;
+  rafId = requestAnimationFrame(tickMarquee);
+}
+
+function setMarqueeText(text) {
+  // テキストが変わっていなければ何もしない（5秒ポーリングで毎回呼ばれるため必須）
+  if (text === currentMarqueeText) return;
+  currentMarqueeText = text;
+
+  stopMarquee();
+  // テキスト変更中に画面外へ退避
+  marqueeEl.style.transform = `translateX(9999px)`;
+  marqueeEl.textContent = text;
+  // 2フレーム待ってレイアウトを確定させてから開始
+  requestAnimationFrame(() => requestAnimationFrame(tickMarquee));
+}
+
+function setCover(url) {
+  if (url) {
+    coverEl.src = url;
+    coverEl.style.display = "block";
+  } else {
+    coverEl.removeAttribute("src");
+    coverEl.style.display = "none";
+  }
+}
+
+async function fetchNowPlaying() {
+  try {
+    const res = await fetch("/api/now-playing", { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 401 && data.login_url) {
+        statusEl.textContent = "Spotify ログインが必要です";
+        statusEl.className = "status error";
+        setMarqueeText("画面下のログインボタンから Spotify にログインしてください。");
+        setCover(null);
+        clearAlbumInfo();
+        clearTrackDetails();
+        return;
+      }
+
+      statusEl.textContent = "取得エラー";
+      statusEl.className = "status error";
+      setMarqueeText(data.error || "現在再生情報の取得に失敗しました。");
+      setCover(null);
+      clearAlbumInfo();
+      clearTrackDetails();
+      return;
+    }
+
+    if (!data.is_playing) {
+      statusEl.textContent = "Paused / Not Playing";
+      statusEl.className = "status stopped";
+      setMarqueeText(data.message || "現在、再生中のコンテンツはありません");
+      setCover(data.image_url || null);
+      clearAlbumInfo();
+      clearTrackDetails();
+      return;
+    }
+
+    statusEl.textContent = data.type === "episode" ? "Podcast" : "NOW PLAYING";
+    statusEl.className = "status playing";
+    setMarqueeText(data.display_text || "再生中");
+    setCover(data.image_url || null);
+    if (data.type !== "episode") {
+      setAlbumInfo(data);
+      setTrackDetails(data);
+    } else {
+      clearAlbumInfo();
+      clearTrackDetails();
+    }
+
+  } catch (err) {
+    statusEl.textContent = "通信エラー";
+    statusEl.className = "status error";
+    setMarqueeText(String(err));
+    setCover(null);
+    clearAlbumInfo();
+    clearTrackDetails();
+  }
+}
+
+fetchNowPlaying();
+setInterval(fetchNowPlaying, 5000);

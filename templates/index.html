@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=800, initial-scale=1.0" />
+  <title>Spotify Now Playing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@700;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="screen">
+    <div class="card">
+      <div class="top-row">
+        <div class="cover-wrap">
+          <img id="cover" class="cover" alt="album cover" />
+        </div>
+        <div id="album-meta" class="album-meta">
+          <div id="album-type" class="album-type-badge"></div>
+          <div id="album-name" class="album-name"></div>
+          <div id="album-artists" class="album-artists"></div>
+          <div id="release-date" class="release-date"></div>
+        </div>
+      </div>
+
+      <div class="marquee-outer">
+        <div id="status" class="status">起動中…</div>
+        <div class="marquee-track">
+          <div id="marquee" class="marquee-inner">
+            Spotify に接続中…
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-row">
+        <div class="track-details">
+          <div class="track-detail" id="detail-key" style="display:none">
+            <span class="detail-label">KEY</span>
+            <span id="track-key" class="detail-value"></span>
+          </div>
+          <div class="track-detail" id="detail-duration" style="display:none">
+            <span class="detail-label">TIME</span>
+            <span id="track-duration" class="detail-value"></span>
+          </div>
+        </div>
+      </div>
+
+      {% if not logged_in %}
+      <div class="login-box">
+        <a class="login-button" href="/login">Spotify でログイン</a>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

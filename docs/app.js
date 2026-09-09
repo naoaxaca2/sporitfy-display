@@ -10,6 +10,12 @@ const trackKeyEl = document.getElementById("track-key");
 const trackDurationEl = document.getElementById("track-duration");
 const detailKeyEl = document.getElementById("detail-key");
 const detailDurationEl = document.getElementById("detail-duration");
+const loginBoxEl = document.getElementById("login-box");
+const loginButtonEl = document.getElementById("login-button");
+
+function showLoginBox(visible) {
+  loginBoxEl.hidden = !visible;
+}
 
 const ALBUM_TYPE_LABEL = {
   album: "ALBUM",
@@ -126,28 +132,32 @@ function setCover(url) {
 
 async function fetchNowPlaying() {
   try {
-    const res = await fetch("/api/now-playing", { cache: "no-store" });
-    const data = await res.json();
+    const result = await NowPlayingSource.getNowPlaying();
 
-    if (!res.ok) {
-      if (res.status === 401 && data.login_url) {
-        statusEl.textContent = "Spotify ログインが必要です";
-        statusEl.className = "status error";
-        setMarqueeText("画面下のログインボタンから Spotify にログインしてください。");
-        setCover(null);
-        clearAlbumInfo();
-        clearTrackDetails();
-        return;
-      }
+    if (result.status === "login") {
+      statusEl.textContent = "Spotify ログインが必要です";
+      statusEl.className = "status error";
+      setMarqueeText("画面下のログインボタンから Spotify にログインしてください。");
+      setCover(null);
+      clearAlbumInfo();
+      clearTrackDetails();
+      showLoginBox(true);
+      return;
+    }
 
+    showLoginBox(false);
+
+    if (result.status === "error") {
       statusEl.textContent = "取得エラー";
       statusEl.className = "status error";
-      setMarqueeText(data.error || "現在再生情報の取得に失敗しました。");
+      setMarqueeText(result.message || "現在再生情報の取得に失敗しました。");
       setCover(null);
       clearAlbumInfo();
       clearTrackDetails();
       return;
     }
+
+    const data = result.data;
 
     if (!data.is_playing) {
       statusEl.textContent = "Paused / Not Playing";
@@ -174,12 +184,25 @@ async function fetchNowPlaying() {
   } catch (err) {
     statusEl.textContent = "通信エラー";
     statusEl.className = "status error";
-    setMarqueeText(String(err));
+    setMarqueeText(String(err.message || err));
     setCover(null);
     clearAlbumInfo();
     clearTrackDetails();
   }
 }
 
-fetchNowPlaying();
-setInterval(fetchNowPlaying, 5000);
+loginButtonEl.addEventListener("click", () => NowPlayingSource.login());
+
+(async () => {
+  try {
+    await NowPlayingSource.init();
+  } catch (err) {
+    statusEl.textContent = "認証エラー";
+    statusEl.className = "status error";
+    setMarqueeText(String(err.message || err));
+    showLoginBox(true);
+    return;
+  }
+  fetchNowPlaying();
+  setInterval(fetchNowPlaying, 5000);
+})();

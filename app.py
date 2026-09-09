@@ -21,12 +21,14 @@ from urllib.parse import urlencode
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, request, send_from_directory
 
 # .env読み込み
 load_dotenv()
 
-app = Flask(__name__)
+# フロントエンドは docs/ に一式置き、GitHub Pages と共用する。
+# static_url_path="" にすることで、Pages と同じ相対パスでファイルが解決される。
+app = Flask(__name__, static_folder="docs", static_url_path="")
 
 # 正常レスポンス（2xx）のアクセスログを抑制する
 class _SuppressSuccess(logging.Filter):
@@ -255,9 +257,17 @@ def fetch_now_playing(access_token):
 
 @app.route("/")
 def index():
-    """メイン画面"""
-    logged_in = load_tokens() is not None
-    return render_template("index.html", logged_in=logged_in)
+    """メイン画面（docs/index.html をそのまま返す）"""
+    return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route("/api/mode")
+def mode():
+    """フロントエンドがサーバの有無を判定するためのエンドポイント。
+
+    GitHub Pages ではこのパスが 404 になるため、フロント側は PKCE モードに切り替わる。
+    """
+    return jsonify({"mode": "server", "logged_in": load_tokens() is not None})
 
 
 @app.route("/login")

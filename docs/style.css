@@ -214,3 +214,11 @@ html, body {
 .error {
   color: #ff6b6b;
 }
+
+/* ログインボタンは <a> ではなく <button> で描画するためのリセット */
+button.login-button {
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

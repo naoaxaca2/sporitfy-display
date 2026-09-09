@@ -6,7 +6,7 @@
   <title>Spotify Now Playing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+2:wght@700;800&display=swap">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="screen">
@@ -45,14 +45,14 @@
         </div>
       </div>
 
-      {% if not logged_in %}
-      <div class="login-box">
-        <a class="login-button" href="/login">Spotify でログイン</a>
+      <div class="login-box" id="login-box" hidden>
+        <button class="login-button" id="login-button" type="button">Spotify でログイン</button>
       </div>
-      {% endif %}
     </div>
   </main>
 
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="config.js"></script>
+  <script src="source.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

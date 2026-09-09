@@ -1,0 +1,11 @@
+# 認証情報（絶対にコミットしない）
+.env
+token_store.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

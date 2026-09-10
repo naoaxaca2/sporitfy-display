@@ -66,7 +66,10 @@ function clearTrackDetails() {
   detailDurationEl.style.display = "none";
 }
 
-const SCROLL_SPEED = 90; // px/s（数値を上げると速くなる）
+const SCROLL_SPEED = 90; // px/s（表示幅 800px のときの速度。上げると速くなる）
+// 速度を決める基準幅。表示幅がこれより広いと、その比率で自動的に速くなる。
+// 帯型ディスプレイで「曲名が右から出てくるまで延々待つ」のを防ぐための調整。
+const SPEED_REFERENCE_WIDTH = 800;
 // コンテナ幅の何割分、最後の文字が消えたあとも流し続けるか
 const TAIL_RATIO = 0.3;
 
@@ -96,7 +99,7 @@ function tickMarquee(ts) {
 
   if (lastTs !== null) {
     const dt = (ts - lastTs) / 1000;
-    marqueeX -= SCROLL_SPEED * dt;
+    marqueeX -= scrollSpeedFor(containerW) * dt;
     if (marqueeX <= endX) {
       marqueeX = startX; // 先頭に戻る
     }
@@ -104,6 +107,28 @@ function tickMarquee(ts) {
   lastTs = ts;
 
   marqueeEl.style.transform = `translateX(${marqueeX}px)`;
+  rafId = requestAnimationFrame(tickMarquee);
+}
+
+function scrollSpeedFor(containerW) {
+  // 表示幅に比例して速くする。狭い画面では従来どおり 90px/s のまま
+  return SCROLL_SPEED * Math.max(1, containerW / SPEED_REFERENCE_WIDTH);
+}
+
+function startMarquee() {
+  stopMarquee();
+
+  const containerW = marqueeEl.parentElement.offsetWidth;
+  const textW = marqueeEl.scrollWidth;
+
+  // 収まりきるなら静止表示にする。
+  // 帯型ディスプレイでは大半の曲名がここに入り、無駄なスクロール待ちが消える。
+  // requestAnimationFrame も回さないので Pi Zero 2 W の負荷も下がる。
+  if (textW <= containerW) {
+    marqueeEl.style.transform = "translateX(0)";
+    return;
+  }
+
   rafId = requestAnimationFrame(tickMarquee);
 }
 
@@ -117,8 +142,13 @@ function setMarqueeText(text) {
   marqueeEl.style.transform = `translateX(9999px)`;
   marqueeEl.textContent = text;
   // 2フレーム待ってレイアウトを確定させてから開始
-  requestAnimationFrame(() => requestAnimationFrame(tickMarquee));
+  requestAnimationFrame(() => requestAnimationFrame(startMarquee));
 }
+
+// 静止表示中は rAF が止まっているため、リサイズは明示的に拾い直す
+window.addEventListener("resize", () => {
+  if (currentMarqueeText !== null) startMarquee();
+});
 
 function setCover(url) {
   if (url) {
